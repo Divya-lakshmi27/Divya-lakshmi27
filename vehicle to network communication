@@ -1,0 +1,101 @@
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import numpy as np
+import random
+import gym
+
+class V2N_Environment(gym.Env):
+    def _init_(self):
+        self.state_dim = 4
+        self.action_dim = 2
+        self.observation_space = gym.spaces.Box(low=-100, high=100, shape=(self.state_dim,))
+        self.action_space = gym.spaces.Discrete(2)
+
+    def reset(self):
+        self.state = np.array([random.uniform(0, 100), random.uniform(0, 360), random.uniform(0, 1000), random.randint(0, 10)])
+        return self.state
+
+    def step(self, action):
+        reward = -1
+        if action == 1:
+            if self.state[2] < 500:
+                reward = 10
+            else:
+                reward = -10
+        self.state[0] += random.uniform(-10, 10)
+        self.state[1] += random.uniform(-10, 10)
+        self.state[2] += random.uniform(-100, 100)
+        self.state[3] = random.randint(0, 10)
+        done = False
+        if self.state[2] < 0 or self.state[2] > 1000:
+            done = True
+        return self.state, reward, done, {}
+
+class DDQN(nn.Module):
+    def _init_(self, state_dim, action_dim):
+        super(DDQN, self)._init_()
+        self.fc1 = nn.Linear(state_dim, 128)
+        self.fc2 = nn.Linear(128, 128)
+        self.fc3 = nn.Linear(128, action_dim)
+
+    def forward(self, x):
+        x = torch.relu(self.fc1(x))
+        x = torch.relu(self.fc2(x))
+        x = self.fc3(x)
+        return x
+
+def train(env, model, target_model, optimizer, buffer, batch_size, gamma, epsilon):
+    episode_rewards = []
+    for episode in range(1000):
+        state = env.reset()
+        done = False
+        rewards = 0.0
+        while not done:
+            if random.random() < epsilon:
+                action = env.action_space.sample()
+            else:
+                q_values = model(torch.tensor(state, dtype=torch.float32))
+                action = torch.argmax(q_values).item()
+            next_state, reward, done, _ = env.step(action)
+            rewards += reward
+            buffer.append((state, action, reward, next_state, done))
+            if len(buffer) > batch_size:
+                buffer.pop(0)
+            if len(buffer) == batch_size:
+                batch = random.sample(buffer, batch_size)
+                states, actions, rewards, next_states, dones = zip(*batch)
+                states = torch.tensor(states, dtype=torch.float32)
+                actions = torch.tensor(actions, dtype=torch.long)
+                rewards = torch.tensor(rewards, dtype=torch.float32)
+                next_states = torch.tensor(next_states, dtype=torch.float32)
+                dones = torch.tensor(dones, dtype=torch.bool)
+                q_values = model(states)
+                q_value = q_values.gather(1, actions.unsqueeze(1)).squeeze(1)
+                next_q_values = target_model(next_states)
+                next_q_value = next_q_values.max(1)[0]
+                expected_q_value = rewards + gamma * next_q_value * (~dones)
+                loss = (q_value - expected_q_value).pow(2).mean()
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                target_model.load_state_dict(model.state_dict())
+        episode_rewards.append(rewards)
+        print(f'Episode {episode+1}, Reward: {rewards}')
+        if episode % 100 == 0:
+            print(f'Episode {episode+1}, Average Reward: {np.mean(episode_rewards[-100:]).item():.2f}')
+    print(f'Final Average Reward: {np.mean(episode_rewards[-100:]).item():.2f}')
+
+def main():
+    env = V2N_Environment()
+    model = DDQN(state_dim=env.state_dim, action_dim=env.action_space.n)
+    target_model = DDQN(state_dim=env.state_dim, action_dim=env.action_space.n)
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    buffer = []
+    batch_size = 32
+    gamma = 0.99
+    epsilon = 0.1
+    train(env, model, target_model, optimizer, buffer, batch_size, gamma, epsilon)
+
+if _name_ == '_main_':
+    main()
