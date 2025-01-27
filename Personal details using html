@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Details</title>
+    <style>
+        body {
+            background-color: tomoto;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+        h1 {
+            text-align: center;
+            color: tomato;
+        }
+        h2 {
+            color: #4caf50;
+        }
+        h3 {
+            color: #2196f3;
+        }
+        p {
+            color: #555;
+            line-height: 1.6;
+        }
+        hr {
+            border: 0;
+            border-top: 2px solid #ddd;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Details</h1>
+
+    <h2>Education</h2>
+    <p>Bachelor of Technology, Tirumala Engineering College</p>
+    <hr>
+
+    <h2>Personal Details</h2>
+    <p>Name: Rajavarapu Divyalakshmi</p>
+    <p>ID: 21NE1A05F7</p>
+    <hr>
+
+    <h2>Strengths</h2>
+    <p>Hardworking, Quick Learner, Team Player</p>
+    <hr>
+
+    <h2>Skills</h2>
+    <p>Problem-Solving, Analytical Thinking</p>
+    <hr>
+
+    <h2>Technical Skills</h2>
+    <p>Programming Languages: C, Java, Python</p>
+    <p>Web Development: HTML, CSS, JavaScript</p>
+    <hr>
+
+    <h2>Languages</h2>
+    <p>English, Telugu, Hindi</p>
+    <hr>
+
+    <h2>Interests</h2>
+    <p>Reading, Coding, Music</p>
+</body>
+</html>
