@@ -1,0 +1,130 @@
+# Import Required Libraries
+import numpy as np
+import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense
+import random
+import matplotlib.pyplot as plt
+
+# Set random seeds for reproducibility
+np.random.seed(42)
+tf.random.set_seed(42)
+
+# Environment Simulation (Vehicle-to-Network Communication)
+class VehicularNetworkEnv:
+    def __init__(self, num_bs=5, state_dim=4):
+        self.num_bs = num_bs  # Number of Base Stations
+        self.state_dim = state_dim  # State dimensions (e.g., RSRP, RSRQ, speed, BS load)
+        self.action_space = [i for i in range(self.num_bs)]  # Actions: Connect to a BS
+        self.state = None
+
+    def reset(self):
+        # Reset environment to initial state
+        self.state = np.random.rand(self.state_dim)
+        return self.state
+
+    def step(self, action):
+        # Simulate reward based on action
+        # Example: Higher reward for better BS selection
+        reward = np.random.rand() - 0.1 * abs(action - np.argmax(self.state))
+        reward = max(-1, min(1, reward))  # Clip reward to [-1, 1]
+        
+        # New state and done flag
+        next_state = np.random.rand(self.state_dim)
+        done = random.random() < 0.1  # Randomly end episode 10% of the time
+        
+        return next_state, reward, done
+
+# Define Double Deep Q-Network (DDQN) Agent
+class DDQNAgent:
+    def __init__(self, state_dim, action_dim, learning_rate=0.001):
+        self.state_dim = state_dim
+        self.action_dim = action_dim
+        self.epsilon = 1.0  # Exploration rate
+        self.epsilon_min = 0.1
+        self.epsilon_decay = 0.995
+        self.gamma = 0.95  # Discount factor
+        self.learning_rate = learning_rate
+        self.memory = []  # Replay buffer
+        self.batch_size = 32
+        self.train_start = 1000
+        self.action_space = [i for i in range(self.action_dim)]  # Define action space
+
+        # Build online and target networks
+        self.model = self.build_model()
+        self.target_model = self.build_model()
+        self.update_target_model()
+
+    def build_model(self):
+        # Build a simple neural network
+        model = Sequential([
+            Dense(64, input_dim=self.state_dim, activation='relu'),
+            Dense(32, activation='relu'),
+            Dense(self.action_dim, activation='linear')  # Q-values
+        ])
+        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=self.learning_rate),
+                      loss='mse')
+        return model
+
+    def update_target_model(self):
+        self.target_model.set_weights(self.model.get_weights())
+
+    def remember(self, state, action, reward, next_state, done):
+        self.memory.append((state, action, reward, next_state, done))
+        if len(self.memory) > 2000:  # Limit replay buffer size
+            self.memory.pop(0)
+
+    def act(self, state):
+        if np.random.rand() <= self.epsilon:
+            return random.choice(self.action_space)  # Use agent's action space
+        q_values = self.model.predict(np.expand_dims(state, axis=0), verbose=0)
+        return np.argmax(q_values[0])
+
+    def replay(self):
+        if len(self.memory) < self.train_start:
+            return
+        
+        minibatch = random.sample(self.memory, self.batch_size)
+        for state, action, reward, next_state, done in minibatch:
+            target = self.model.predict(np.expand_dims(state, axis=0), verbose=0)[0]
+            if done:
+                target[action] = reward
+            else:
+                next_q_values = self.target_model.predict(np.expand_dims(next_state, axis=0), verbose=0)[0]
+                target[action] = reward + self.gamma * np.max(next_q_values)
+
+            self.model.fit(np.expand_dims(state, axis=0), np.expand_dims(target, axis=0), verbose=0)
+
+        if self.epsilon > self.epsilon_min:
+            self.epsilon *= self.epsilon_decay
+
+# Train DDQN on Vehicular Network Environment
+env = VehicularNetworkEnv()
+agent = DDQNAgent(state_dim=env.state_dim, action_dim=len(env.action_space))
+
+episodes = 500
+rewards = []
+
+for episode in range(episodes):
+    state = env.reset()
+    total_reward = 0
+    while True:
+        action = agent.act(state)
+        next_state, reward, done = env.step(action)
+        agent.remember(state, action, reward, next_state, done)
+        agent.replay()
+        state = next_state
+        total_reward += reward
+        if done:
+            break
+
+    agent.update_target_model()
+    rewards.append(total_reward)
+    print(f"Episode: {episode+1}/{episodes}, Total Reward: {total_reward:.2f}, Epsilon: {agent.epsilon:.2f}")
+
+# Plot Training Rewards
+plt.plot(rewards)
+plt.xlabel("Episodes")
+plt.ylabel("Total Reward")
+plt.title("Training Performance")
+plt.show()
